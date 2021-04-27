@@ -4,10 +4,13 @@ authors = ["vasanth <vasanth.mani.vasi.2@gmail.com> and contributors"]
 version = "0.1.0"
 
 [deps]
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 MIDI = "f57c4921-e30c-5f49-b073-3f2f2ada663e"
 
 [compat]
 julia = "1"
+FileIO = "1.8"
+MIDI = "1.12.5"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

@@ -1,11 +1,13 @@
-export ckpt2bson
+export ckpt_to_jld2, load_pretrain
 
-using Flux, BSON, Requires
+using JLD2, Requires
 using Flux: loadparams!
+
+readckpt(path) = error("TensorFlow.jl is required to read the checkpoint. Run `Pkg.add(\"TensorFlow\"); using TensorFlow`")
 
 @init @require TensorFlow="1d978283-2c37-5f34-9a8e-e9c0ece82495" begin
   import .TensorFlow
-    function readckpt(path)
+    function readckpt(path::String)
         weights = Dict{String, Array}()
         TensorFlow.init()
         ckpt = TensorFlow.pywrap_tensorflow.x.NewCheckpointReader(path)
@@ -23,7 +25,10 @@ using Flux: loadparams!
     end
 end
 
-function load_model(weights, input_dims, lstm_units)
+"""     load_model(weights, input_dims, lstm_units)
+Loads the weights into a Flux model
+"""
+function load_model(weights, input_dims::Int, lstm_units::Int)
     weight_names = keys(weights)
     rnn_weights = filter(name -> occursin("rnn", name), weight_names)
     dense_weights = filter(name -> occursin("fully_connected", name), weight_names)
@@ -69,12 +74,29 @@ function load_model(weights, input_dims, lstm_units)
     model
 end
 
-function ckpt2bson(ckptpath, input_dims, lstm_units, ckptname="perfrnn.ckpt", savepath="./")
+"""     ckp2_to_jld2(ckptpath, input_dims, lstm_units)
+Loads a pre-trained model from a tensorflow checkpoint and saves to jld2
+"""
+function ckpt_to_jld2(ckptpath::String, input_dims::Int, lstm_units::Int, ckptname::String="perfrnn.ckpt", savepath::String="./")
     files = readdir(ckptpath)
     ckptname ∉ files && error("The checkpoint file $ckptname is not found")
     ckptname*".meta" ∉ files && error("The checkpoint meta file is not found")
     weights = readckpt(joinpath(ckptpath, ckptname))
     model = load_model(weights, input_dims, lstm_units)
-    bsonname = normpath(joinpath(savepath, ckptname[1:end-5]*".bson"))
-    BSON.@save bsonname model
+    jld2name = normpath(joinpath(savepath, ckptname[1:end-5]*".jld2"))
+    @info "Saving the model to $jld2name"
+    JLD2.@save jld2name model
+end
+
+"""     load_pretrain(path)
+Loads a pre-trained performance rnn model from the given .jld2 file.
+"""
+function load_pretrain(path::String)
+    if endswith(path, ".jld2")
+        JLD2.@load path model
+        return model
+    else
+        error("""Invalid file. Please pass a jld2 file.
+                 If this is a tensorflow checkpoint file, please run ckpt_to_jld2""")
+    end
 end

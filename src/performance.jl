@@ -1,3 +1,5 @@
+export Performance, PerformanceEvent, encodeindex, decodeindex, perf2notes
+
 struct PerformanceEvent
     event_type::Int
     event_value::Int

@@ -1,3 +1,5 @@
+export NOTE_ON, NOTE_OFF, TIME_SHIFT, VELOCITY
+
 # Performance event related constants
 const NOTE_ON = 1
 const NOTE_OFF = 2

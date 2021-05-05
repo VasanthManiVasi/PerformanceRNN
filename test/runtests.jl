@@ -1,4 +1,4 @@
 using PerformanceRNN
 using Test
 
-include("pretrain.jl")
+include("performance.jl")

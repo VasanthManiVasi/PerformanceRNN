@@ -76,3 +76,42 @@ function decodeindex(idx::Int, perfctx::Performance)
         offset += (max - min + 1)
     end
 end
+
+function perf2notes(events::Vector{PerformanceEvent}, perfctx::Performance)
+    # TODO:
+    #   Declare the defaults in constants.jl
+    ppq = 220 # default by magenta
+    qpm = 120 # default by magenta
+    ticks_per_step = second_to_tick(1, qpm, ppq) ÷ perfctx.steps_per_second
+    notes = Notes(tpq = ppq)
+    pitchmap = Dict{Int, Tuple{Int, Int}}()
+    step = 0
+    velocity = 64
+    for event in events
+        if event.event_type == NOTE_ON
+            pitchmap[event.event_value] = (step, velocity)
+        elseif event.event_type == NOTE_OFF
+            if event.event_value in keys(pitchmap)
+                start_step, vel = pitchmap[event.event_value]
+                position = ticks_per_step * start_step
+                duration = ticks_per_step * step
+                push!(notes, Note(event.event_value, vel, position, duration))
+            end
+        elseif event.event_type == TIME_SHIFT
+            step += event.event_value
+        elseif event.event_type == VELOCITY
+            if event.event_value != velocity
+                velocity = bin2velocity(event.event_value, perfctx.velocity_bins)
+            end
+        end
+    end
+
+    notes
+end
+
+binsize(velocity_bins) = Int(ceil(
+        (MAX_MIDI_VELOCITY - MIN_MIDI_VELOCITY + 1) / velocity_bins))
+
+bin2velocity(bin, velocity_bins) = MIN_MIDI_VELOCITY + (bin - 1) * binsize(velocity_bins)
+
+second_to_tick(second, qpm, tpq) = second ÷ (1e-3 * ms_per_tick(qpm, tpq))

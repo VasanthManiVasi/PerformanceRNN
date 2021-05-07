@@ -44,10 +44,12 @@ end
 
 struct Performance
     # Stores the ranges of each event
-    event_ranges::Vector{Tuple{Int, Int ,Int}}
+    velocity_bins::Int
+    steps_per_second::Int
     num_classes::Int
+    event_ranges::Vector{Tuple{Int, Int ,Int}}
 
-    function Performance(;velocity_bins::Int = 32, max_shift_steps::Int = 100)
+    function Performance(;velocity_bins::Int = 32, steps_per_second = 100, max_shift_steps::Int = 100)
         event_ranges = [
             (NOTE_ON, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
             (NOTE_OFF, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
@@ -55,7 +57,15 @@ struct Performance
         ]
         velocity_bins > 0 && push!(event_ranges, (VELOCITY, 1, velocity_bins))
         num_classes = sum(map(range -> range[3] - range[2] + 1, event_ranges))
-        new(event_ranges, num_classes)
+        new(velocity_bins, steps_per_second, num_classes, event_ranges)
+    end
+end
+
+function Base.getproperty(obj::Performance, sym::Symbol)
+    if sym === :labels
+        return 0:(obj.num_classes - 1)
+    else
+        getfield(obj, sym)
     end
 end
 

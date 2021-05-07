@@ -84,17 +84,30 @@ function perf2notes(events::Vector{PerformanceEvent}, perfctx::Performance)
     #   Declare the defaults in constants.jl
     ppq = 220 # default by magenta
     qpm = 120 # default by magenta
-    ticks_per_step = second_to_tick(1, qpm, ppq) ÷ perfctx.steps_per_second
+    ticks_per_step = second_to_tick(1, qpm, ppq) ÷ perfctx.steps_per_second # sps = 100
     notes = Notes(tpq = ppq)
-    pitchmap = Dict{Int, Tuple{Int, Int}}()
+    pitchmap = Dict{Int, Vector{Tuple{Int, Int}}}()
     step = 0
     velocity = 64
     for event in events
         if event.event_type == NOTE_ON
-            pitchmap[event.event_value] = (step, velocity)
+            if event.event_value in keys(pitchmap)
+                push!(pitchmap[event.event_value], (step, velocity))
+            else
+                pitchmap[event.event_value] = [(step, velocity)]
+            end
         elseif event.event_type == NOTE_OFF
             if event.event_value in keys(pitchmap)
-                start_step, vel = pitchmap[event.event_value]
+                start_step, vel = popfirst!(pitchmap[event.event_value])
+
+                if isempty(pitchmap[event.event_value])
+                    delete!(pitchmap, event.event_value)
+                end
+
+                if step == start_step
+                    continue
+                end
+
                 position = ticks_per_step * start_step
                 duration = ticks_per_step * step
                 push!(notes, Note(event.event_value, vel, position, duration))
@@ -105,6 +118,15 @@ function perf2notes(events::Vector{PerformanceEvent}, perfctx::Performance)
             if event.event_value != velocity
                 velocity = bin2velocity(event.event_value, perfctx.velocity_bins)
             end
+        end
+    end
+
+    # End the notes which don't have a NOTE_OFF event
+    for pitch in keys(pitchmap)
+        for (start_step, vel) in pitchmap[pitch]
+            position = ticks_per_step * start_step
+            duration = ticks_per_step * (start_step + 5 * perfctx.steps_per_second) # End after 5 seconds
+            push!(notes, Note(pitch, vel, position, duration))
         end
     end
 

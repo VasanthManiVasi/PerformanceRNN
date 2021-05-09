@@ -15,3 +15,6 @@ const MAX_MIDI_VELOCITY = 127
 # Default quantization constant
 const DEFAULT_STEPS_PER_SECOND = 100
 
+# MIDI rhythm related constants
+const DEFAULT_QPM = 120     # Quarter notes per minute
+const DEFAULT_PPQ = 220     # Pulses per quarter note

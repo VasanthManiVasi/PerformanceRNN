@@ -1,5 +1,19 @@
 export Performance, PerformanceEvent, encodeindex, decodeindex, perf2notes
 
+"""     PerformanceEvent <: Any
+Event-based performance representation from Oore et al.
+
+In the performance representation, midi data is encoded as a 388-length one hot vector.
+It corresponds to NOTE_ON, NOTE_OFF events for each of the 128 midi pitches,
+32 bins for the 128 midi velocities and 100 TIME_SHIFT events
+(it can represent a time shift from 10 ms up to 1 second).
+
+`PerformanceEvent` is the base representation.
+
+## Fields
+* `event_type::Int`  :  Type of the event. One of {NOTE_ON, NOTE_OFF, TIME_SHIFT, VELOCITY}.
+* `event_value::Int` :  Value of the event corresponding to its type.
+"""
 struct PerformanceEvent
     event_type::Int
     event_value::Int
@@ -43,11 +57,10 @@ function Base.show(io::IO, a::PerformanceEvent)
 end
 
 struct Performance
-    # Stores the ranges of each event
     velocity_bins::Int
     steps_per_second::Int
     num_classes::Int
-    event_ranges::Vector{Tuple{Int, Int ,Int}}
+    event_ranges::Vector{Tuple{Int, Int ,Int}} # Stores the range of each event type
 
     function Performance(;velocity_bins::Int = 32, steps_per_second::Int = 100, max_shift_steps::Int = 100)
         event_ranges = [
@@ -69,6 +82,9 @@ function Base.getproperty(obj::Performance, sym::Symbol)
     end
 end
 
+"""     encodeindex(event::PerformanceEvent, perfctx::Performance)
+Encodes a `PerformanceEvent` to its corresponding one hot index.
+"""
 function encodeindex(event::PerformanceEvent, perfctx::Performance)
     offset = 0
     for (type, min, max) in perfctx.event_ranges
@@ -79,6 +95,9 @@ function encodeindex(event::PerformanceEvent, perfctx::Performance)
     end
 end
 
+"""     decodeindex(event::PerformanceEvent, perfctx::Performance)
+Decodes a one hot index to its corresponding `PerformanceEvent`.
+"""
 function decodeindex(idx::Int, perfctx::Performance)
     offset = 0
     for (type, min, max) in perfctx.event_ranges
@@ -89,6 +108,9 @@ function decodeindex(idx::Int, perfctx::Performance)
     end
 end
 
+"""     perf2notes(events::Vector{PerformanceEvent}, perfctx::Performance}
+Converts a sequence of `PerformanceEvent`s to `MIDI.Notes`.
+"""
 function perf2notes(events::Vector{PerformanceEvent}, perfctx::Performance
                     ;ppq = DEFAULT_PPQ,
                      qpm = DEFAULT_QPM)

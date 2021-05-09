@@ -1,6 +1,11 @@
 export generate, notes2midi
 
-function generate(model, perfctx::Performance; primer=[PerformanceEvent(TIME_SHIFT, 100)], numsteps=1000)
+"""     generate(model, perfctx::Performance)
+Generate `PerformanceEvent`s by sampling from a model.
+"""
+function generate(model, perfctx::Performance
+                    ;primer=[PerformanceEvent(TIME_SHIFT, 100)],
+                     numsteps=1000)
     Flux.reset!(model)
     indices = map(event -> encodeindex(event, perfctx), primer)
     inputs = map(index -> Flux.onehot(index, perfctx.labels), indices)
@@ -18,6 +23,9 @@ function generate(model, perfctx::Performance; primer=[PerformanceEvent(TIME_SHI
     events
 end
 
+"""     notes2midi(notes::Notes)
+Return a `MIDIFile` from the given `Notes`.
+"""
 function notes2midi(notes::Notes; qpm = 120)
     metatrack = MIDITrack()
     # TODO:

@@ -1,48 +1,32 @@
-export ckpt_to_jld2, load_pretrain
+export ckpt_to_jld2, load_pretrain, list_pretrains, @pretrain_str
 
-using JLD2, Requires
+using JLD2, Requires, Pkg.TOML, DataDeps, GoogleDrive
 using Flux: loadparams!
 
-readckpt(path) = error("TensorFlow.jl is required to read the checkpoint. Run `Pkg.add(\"TensorFlow\"); using TensorFlow`")
-
-@init @require TensorFlow="1d978283-2c37-5f34-9a8e-e9c0ece82495" begin
-  import .TensorFlow
-    function readckpt(path::String)
-        weights = Dict{String, Array}()
-        TensorFlow.init()
-        ckpt = TensorFlow.pywrap_tensorflow.x.NewCheckpointReader(path)
-        shapes = ckpt.get_variable_to_shape_map()
-    
-        for (name, shape) ∈ shapes
-          weight = ckpt.get_tensor(name)
-          if length(shape) == 2
-            weight = collect(weight')
-          end
-          weights[name] = weight
-        end
-    
-        weights
-    end
-end
+const configs = open(TOML.parse, joinpath(@__DIR__, "pretrains.toml"))
 
 """     load_model(weights, input_dims, lstm_units)
 Loads the weights into a Flux model
 """
-function load_model(weights, input_dims::Int, lstm_units::Int)
+function load_model(weights, config)
+    lstm_units = config["lstm_units"]
+    input_dims = config["input_dims"]
+
+    layers = []
+    for i in 1:config["num_layers"]
+        layer = LSTM(
+                     (i == 1) ? input_dims : lstm_units,
+                     lstm_units
+                )
+        push!(layers, layer)
+    end
+    push!(layers, Dense(lstm_units, input_dims))
+
+    model = Chain(layers...)
+
     weight_names = keys(weights)
     rnn_weights = filter(name -> occursin("rnn", name), weight_names)
     dense_weights = filter(name -> occursin("fully_connected", name), weight_names)
-    # TODO:
-    #   Find input_dims and lstm_units automatically (from fully connected layer)
-    #
-    # input_dims = 388 # size(weights[dense_weights], 1)
-    # lstm_units = 512 # size(rnn_)
-    model = Chain(
-        LSTM(input_dims, lstm_units),
-        LSTM(lstm_units, lstm_units),
-        LSTM(lstm_units, lstm_units),
-        Dense(lstm_units, input_dims)
-    )    
 
     for i in 1:length(rnn_weights)
         cell_weights = filter(name -> occursin("cell_$(i-1)", name), rnn_weights)
@@ -77,26 +61,91 @@ end
 """     ckp2_to_jld2(ckptpath, input_dims, lstm_units)
 Loads a pre-trained model from a tensorflow checkpoint and saves to jld2
 """
-function ckpt_to_jld2(ckptpath::String, input_dims::Int, lstm_units::Int, ckptname::String="perfrnn.ckpt", savepath::String="./")
+function ckpt_to_jld2(ckptpath::String; ckptname::String="perfrnn.ckpt", savepath::String="./")
     files = readdir(ckptpath)
     ckptname ∉ files && error("The checkpoint file $ckptname is not found")
     ckptname*".meta" ∉ files && error("The checkpoint meta file is not found")
     weights = readckpt(joinpath(ckptpath, ckptname))
-    model = load_model(weights, input_dims, lstm_units)
+    config = configs[ckptname[end-5:end]]
+    model = load_model(weights, config)
     jld2name = normpath(joinpath(savepath, ckptname[1:end-5]*".jld2"))
     @info "Saving the model to $jld2name"
     JLD2.@save jld2name model
 end
 
-"""     load_pretrain(path)
-Loads a pre-trained performance rnn model from the given .jld2 file.
+# From Transformers.jl
+"""     readckpt(path)
+Load weights from a tensorflow checkpoint file into a Dict.
 """
-function load_pretrain(path::String)
-    if endswith(path, ".jld2")
-        JLD2.@load path model
-        return model
-    else
-        error("""Invalid file. Please pass a jld2 file.
-                 If this is a tensorflow checkpoint file, please run ckpt_to_jld2""")
+readckpt(path) = error("readckpt require TensorFlow.jl installed. run `Pkg.add(\"TensorFlow\"); using TensorFlow`")
+
+@init @require TensorFlow="1d978283-2c37-5f34-9a8e-e9c0ece82495" begin
+  import .TensorFlow
+  #should be changed to use c api once the patch is included
+  function readckpt(path)
+    weights = Dict{String, Array}()
+    TensorFlow.init()
+    ckpt = TensorFlow.pywrap_tensorflow.x.NewCheckpointReader(path)
+    shapes = ckpt.get_variable_to_shape_map()
+
+    for (name, shape) ∈ shapes
+      weight = ckpt.get_tensor(name)
+      if length(shape) == 2 && name != "cls/seq_relationship/output_weights"
+        weight = collect(weight')
+      end
+      weights[name] = weight
+    end
+
+    weights
+  end
+end
+
+"""     load_pretrain(path)
+Loads a pre-trained performance rnn model.
+"""
+function load_pretrain(model_name::String)
+    if model_name ∉ keys(configs)
+        error("""Invalid model. 
+               Please try list_pretrains() to check the available pre-trained models""")
+    end
+    
+    model_path = @datadep_str("$model_name/$model_name.jld2")
+    if !endswith(model_path, ".jld2")
+        error("""Invalid file. A jld2 file is required to load the model.
+                 If this is a tensorflow checkpoint file, run ckpt_to_jld2 to convert""")
+    end
+
+    JLD2.@load model_path model
+    return model
+end
+
+# From Transformers.jl
+macro pretrain_str(name)
+    :(load_pretrain($(esc(name))))
+end
+
+function description(description::String, host::String, link::String, cite=nothing)
+  """
+  $description
+  Released by $(host) at $(link).
+  $(isnothing(cite) ? "" : "\nCiting:\n$cite")"""
+end
+
+"""     list_pretrains()
+List all the available pre-trained models.
+"""
+function list_pretrains()
+    println.(keys(configs))
+    nothing
+end
+
+function register_config(configs)
+    for (model_name, config) in pairs(configs)
+        model_desc = description(config["description"], config["host"], config["link"])
+        checksum = config["checksum"]
+        url = config["url"]
+        dep = DataDep(model_name, model_desc, url, checksum;
+                      fetch_method=google_download)
+        DataDeps.register(dep)
     end
 end

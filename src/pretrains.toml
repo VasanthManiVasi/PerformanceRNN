@@ -6,7 +6,7 @@ num_layers = 3
 input_dims = 356
 lstm_units = 512
 name = "PerformanceRNN"
-url = "https://drive.google.com/uc?id=1dHqgwmSKbGYn-qXk7bvGVwz0ux68XrTq&export=download"
+url = "https://drive.google.com/u/1/uc?id=1dHqgwmSKbGYn-qXk7bvGVwz0ux68XrTq&export=download"
 checksum = "5635ebe6285f89cf29ea01c05fadab141a6fd417a5122b65a5360b4e9af18b20"
 
 [perfrnn_dynamics]

@@ -1,0 +1,22 @@
+[perfrnn]
+host = "Google"
+description = "Baseline PerformanceRNN"
+link = "https://github.com/magenta/magenta/tree/master/magenta/models/performance_rnn"
+num_layers = 3
+input_dims = 356
+lstm_units = 512
+name = "PerformanceRNN"
+url = "https://drive.google.com/uc?id=1dHqgwmSKbGYn-qXk7bvGVwz0ux68XrTq&export=download"
+checksum = "5635ebe6285f89cf29ea01c05fadab141a6fd417a5122b65a5360b4e9af18b20"
+
+[perfrnn_dynamics]
+host = "Google"
+description = "PerformanceRNN with dynamics"
+link = "https://github.com/magenta/magenta/tree/master/magenta/models/performance_rnn"
+num_layers = 3
+input_dims = 388
+lstm_units = 512
+name = "PerformanceRNN with dynamics"
+url = "https://drive.google.com/uc?id=1DsGUHv1mkBlYKL20tYiCJ5FTOrGOvBzU&export=download"
+checksum = "6cd433970d5a0dff9a32be67d2e6a2683e6bc5efc06296ff0cb688ce5c876c54"
+

@@ -53,7 +53,7 @@ function Base.show(io::IO, a::PerformanceEvent)
     end
 
     s *= " $(a.event_value)"
-    println(io, s)
+    print(io, s)
 end
 
 struct Performance

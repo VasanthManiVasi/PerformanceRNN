@@ -7,8 +7,8 @@ input_dims = 356
 lstm_units = 512
 velocity_bins = 0
 name = "PerformanceRNN"
-url = "https://drive.google.com/u/1/uc?id=1dHqgwmSKbGYn-qXk7bvGVwz0ux68XrTq&export=download"
-checksum = "5635ebe6285f89cf29ea01c05fadab141a6fd417a5122b65a5360b4e9af18b20"
+url = "https://drive.google.com/u/1/uc?id=1z7mhFoRyaxZVb3xo5X3pwQYD8sa_m_Ce&export=download"
+checksum = "68ac1b810cfa42bdc1a6d08974f8043a5ec9344a75f7e1f1abca229159d78ab8"
 
 [perfrnn_dynamics]
 host = "Google"
@@ -19,6 +19,6 @@ input_dims = 388
 lstm_units = 512
 velocity_bins = 32
 name = "PerformanceRNN with dynamics"
-url = "https://drive.google.com/uc?id=1DsGUHv1mkBlYKL20tYiCJ5FTOrGOvBzU&export=download"
-checksum = "6cd433970d5a0dff9a32be67d2e6a2683e6bc5efc06296ff0cb688ce5c876c54"
+url = "https://drive.google.com/u/1/uc?id=1qtBdZCpYwwu-5xqoKtR-6io4cqfp4ZYl&export=download"
+checksum = "a57b47da53c9a5e0823ff881909a8f6c74f1e60b2a347587036d344a249fcfdd"
 

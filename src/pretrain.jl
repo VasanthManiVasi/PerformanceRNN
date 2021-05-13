@@ -67,11 +67,9 @@ function ckpt_to_jld2(ckptpath::String; ckptname::String="perfrnn.ckpt", savepat
     ckptname ∉ files && error("The checkpoint file $ckptname is not found")
     ckptname*".meta" ∉ files && error("The checkpoint meta file is not found")
     weights = readckpt(joinpath(ckptpath, ckptname))
-    config = configs[ckptname[end-5:end]]
-    model = load_model(weights, config)
     jld2name = normpath(joinpath(savepath, ckptname[1:end-5]*".jld2"))
-    @info "Saving the model to $jld2name"
-    JLD2.@save jld2name model
+    @info "Saving the model weights to $jld2name"
+    JLD2.@save jld2name weights
 end
 
 # From Transformers.jl
@@ -116,7 +114,8 @@ function load_pretrain(model_name::String)
                  If this is a tensorflow checkpoint file, run ckpt_to_jld2 to convert""")
     end
 
-    JLD2.@load model_path model
+    JLD2.@load model_path weights
+    model = load_model(weights, configs[model_name])
     perfctx = Performance(velocity_bins = configs[model_name]["velocity_bins"])
     perfrnn = PerfRNN(model, perfctx)
 end

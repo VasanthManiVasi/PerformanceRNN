@@ -1,6 +1,7 @@
 export ckpt_to_jld2, load_pretrain, list_pretrains, @pretrain_str
 
-using JLD2, Requires, Pkg.TOML, DataDeps, GoogleDrive
+using JLD2, Requires, Pkg.TOML, DataDeps
+using GoogleDrive: google_download
 using Flux: loadparams!
 
 const configs = open(TOML.parse, joinpath(@__DIR__, "pretrains.toml"))
@@ -116,7 +117,8 @@ function load_pretrain(model_name::String)
     end
 
     JLD2.@load model_path model
-    return model
+    perfctx = Performance(velocity_bins = configs[model_name]["velocity_bins"])
+    perfrnn = PerfRNN(model, perfctx)
 end
 
 # From Transformers.jl
@@ -139,7 +141,7 @@ function list_pretrains()
     nothing
 end
 
-function register_config(configs)
+function register_configs(configs)
     for (model_name, config) in pairs(configs)
         model_desc = description(config["description"], config["host"], config["link"])
         checksum = config["checksum"]

@@ -4,11 +4,12 @@ using Flux, MIDI
 
 include("constants.jl")
 include("performance.jl")
+include("perfrnn.jl")
 include("pretrain.jl")
-include("generate.jl")
+include("utils.jl")
 
 function __init__()
-    register_config(configs)
+    register_configs(configs)
 end
 
 end

@@ -15,6 +15,7 @@ Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 
 [compat]
 FileIO = "1.8"
+GoogleDrive = "0.1"
 MIDI = "1.12.5"
 julia = "1"
 

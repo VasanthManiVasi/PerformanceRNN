@@ -12,6 +12,7 @@ Implementation of the [PerformanceRNN](https://arxiv.org/abs/1808.03715) in Juli
 
 ```julia
 using PerformanceRNN
+using FileIO: save
 
 ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 

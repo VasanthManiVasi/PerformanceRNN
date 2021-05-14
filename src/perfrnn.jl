@@ -43,14 +43,15 @@ end
 # with the TensorFlow 1 BasicLSTMCell implementation
 # https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/keras/layers/legacy_rnn/rnn_cell_impl.py#L786
 function (m::Flux.LSTMCell)((h, c), x) where {A,V,T}
-  b, o = m.b, size(h, 1)
-  g = m.Wi*x .+ m.Wh*h .+ b
-  input = σ.(gate(g, o, 1))
-  cell = tanh.(gate(g, o, 2))
-  forget = σ.(gate(g, o, 3))
-  output = σ.(gate(g, o, 4))
-  c = forget .* c .+ input .* cell
-  h′ = output .* tanh.(c)
-  sz = size(x)
-  return (h′, c), reshape(h′, :, sz[2:end]...)
+    print(" Overload called ")
+    b, o = m.b, size(h, 1)
+    g = m.Wi*x .+ m.Wh*h .+ b
+    input = σ.(gate(g, o, 1))
+    cell = tanh.(gate(g, o, 2))
+    forget = σ.(gate(g, o, 3))
+    output = σ.(gate(g, o, 4))
+    c = forget .* c .+ input .* cell
+    h′ = output .* tanh.(c)
+    sz = size(x)
+    return (h′, c), reshape(h′, :, sz[2:end]...)
 end

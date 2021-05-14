@@ -1,4 +1,5 @@
-export Performance, PerformanceEvent, encodeindex, decodeindex, perf2notes
+export PerformanceEvent, Performance, PerformanceContext
+export encodeindex, decodeindex, perf2notes, len
 
 """     PerformanceEvent <: Any
 Event-based performance representation from Oore et al.
@@ -32,7 +33,7 @@ struct PerformanceEvent
                 error("The event has an invalid velocity value")
             end
         else
-            error("Performance event has invalid type")
+            error("PerformanceEvent has invalid type")
         end
 
         new(type, value)
@@ -49,20 +50,39 @@ function Base.show(io::IO, a::PerformanceEvent)
     elseif a.event_type == VELOCITY
         s = "VELOCITY"
     else
-        error("Performance event has invalid type")
+        error("PerformanceEvent has invalid type")
     end
 
     s *= " $(a.event_value)"
     print(io, s)
 end
 
-struct Performance
+"""     Performance
+A `Performance` is a vector of `PerformanceEvent`s
+"""
+Performance = Vector{PerformanceEvent}
+
+"""     len(perf::Performance)
+Returns the length of a performance in steps
+"""
+function len(perf::Performance)
+    steps = 0
+    for event in perf
+        if event.event_type == TIME_SHIFT
+            steps += event.event_value
+        end
+    end
+
+    steps
+end
+
+struct PerformanceContext
     velocity_bins::Int
     steps_per_second::Int
     num_classes::Int
     event_ranges::Vector{Tuple{Int, Int ,Int}} # Stores the range of each event type
 
-    function Performance(;velocity_bins::Int = 32, steps_per_second::Int = 100, max_shift_steps::Int = 100)
+    function PerformanceContext(;velocity_bins::Int = 32, steps_per_second::Int = 100, max_shift_steps::Int = 100)
         event_ranges = [
             (NOTE_ON, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
             (NOTE_OFF, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
@@ -74,7 +94,7 @@ struct Performance
     end
 end
 
-function Base.getproperty(obj::Performance, sym::Symbol)
+function Base.getproperty(obj::PerformanceContext, sym::Symbol)
     if sym === :labels
         return 0:(obj.num_classes - 1)
     else
@@ -82,10 +102,10 @@ function Base.getproperty(obj::Performance, sym::Symbol)
     end
 end
 
-"""     encodeindex(event::PerformanceEvent, perfctx::Performance)
+"""     encodeindex(event::PerformanceEvent, perfctx::PerformanceContext)
 Encodes a `PerformanceEvent` to its corresponding one hot index.
 """
-function encodeindex(event::PerformanceEvent, perfctx::Performance)
+function encodeindex(event::PerformanceEvent, perfctx::PerformanceContext)
     offset = 0
     for (type, min, max) in perfctx.event_ranges
         if event.event_type == type
@@ -95,10 +115,10 @@ function encodeindex(event::PerformanceEvent, perfctx::Performance)
     end
 end
 
-"""     decodeindex(event::PerformanceEvent, perfctx::Performance)
+"""     decodeindex(idx::Int, perfctx::PerformanceContext)
 Decodes a one hot index to its corresponding `PerformanceEvent`.
 """
-function decodeindex(idx::Int, perfctx::Performance)
+function decodeindex(idx::Int, perfctx::PerformanceContext)
     offset = 0
     for (type, min, max) in perfctx.event_ranges
         if idx < offset + (max - min + 1)
@@ -108,10 +128,10 @@ function decodeindex(idx::Int, perfctx::Performance)
     end
 end
 
-"""     perf2notes(events::Vector{PerformanceEvent}, perfctx::Performance}
+"""     perf2notes(events::Performance, perfctx::PerformanceContext}
 Converts a sequence of `PerformanceEvent`s to `MIDI.Notes`.
 """
-function perf2notes(events::Vector{PerformanceEvent}, perfctx::Performance
+function perf2notes(events::Performance, perfctx::PerformanceContext
                     ;ppq = DEFAULT_PPQ,
                      qpm = DEFAULT_QPM)
     ticks_per_step = second_to_tick(1, qpm, ppq) ÷ perfctx.steps_per_second # sps = 100

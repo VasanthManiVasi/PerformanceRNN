@@ -116,7 +116,7 @@ function load_pretrain(model_name::String)
 
     JLD2.@load model_path weights
     model = load_model(weights, configs[model_name])
-    perfctx = Performance(velocity_bins = configs[model_name]["velocity_bins"])
+    perfctx = PerformanceContext(velocity_bins = configs[model_name]["velocity_bins"])
     perfrnn = PerfRNN(model, perfctx)
 end
 

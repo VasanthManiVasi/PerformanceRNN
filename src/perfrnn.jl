@@ -5,36 +5,42 @@ using Flux: gate
 
 struct PerfRNN
     model
-    perfctx::Performance
+    perfctx::PerformanceContext
 end
 
 """     generate(model, perfctx::Performance)
 Generate `PerformanceEvent`s by sampling from a model.
 """
 function generate(perfrnn::PerfRNN;
-        primer::Vector{PerformanceEvent}=[PerformanceEvent(TIME_SHIFT, 100)],
+        primer::Performance=[PerformanceEvent(TIME_SHIFT, 100)],
         numsteps=1000,
         raw = false)
 
     model, perfctx = perfrnn.model, perfrnn.perfctx # For readability
     Flux.reset!(model)
-        
-    indices = map(event -> encodeindex(event, perfctx), primer)
+    
+    # Primer is already numsteps or longer
+    if len(primer) >= numsteps
+        return primer
+    end
+
+    performance = deepcopy(primer)
+
+    indices = map(event -> encodeindex(event, perfctx), performance)
     inputs = map(index -> Flux.onehot(index, perfctx.labels), indices)
-    events = deepcopy(primer)
 
     outputs = model.(inputs)
     out = wsample(perfctx.labels, softmax(outputs[end]))
-    push!(events, decodeindex(out, perfctx))
+    push!(performance, decodeindex(out, perfctx))
 
-    for _ in 1:numsteps
+    while len(performance) < numsteps
         input = Flux.onehot(out, perfctx.labels)
         out = wsample(perfctx.labels, softmax(model(input)))
-        push!(events, decodeindex(out, perfctx))
+        push!(performance, decodeindex(out, perfctx))
     end
 
-    raw == true && return events
-    notes = perf2notes(events, perfctx)
+    raw == true && return performance
+    notes = perf2notes(performance, perfctx)
     sort!(notes.notes, by=note -> note.position)
     notes
 end

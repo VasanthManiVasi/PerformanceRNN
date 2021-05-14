@@ -134,7 +134,7 @@ Converts a sequence of `PerformanceEvent`s to `MIDI.Notes`.
 function perf2notes(events::Performance, perfctx::PerformanceContext
                     ;ppq = DEFAULT_PPQ,
                      qpm = DEFAULT_QPM)
-    ticks_per_step = second_to_tick(1, qpm, ppq) ÷ perfctx.steps_per_second # sps = 100
+    ticks_per_step = second_to_tick(1, qpm, ppq) / perfctx.steps_per_second # sps = 100
     notes = Notes(tpq = ppq)
     pitchmap = Dict{Int, Vector{Tuple{Int, Int}}}()
     step = 0
@@ -159,8 +159,8 @@ function perf2notes(events::Performance, perfctx::PerformanceContext
                     continue
                 end
 
-                position = ticks_per_step * start_step
-                duration = ticks_per_step * step
+                position = round(ticks_per_step * start_step)
+                duration = round(ticks_per_step * (step - start_step))
                 push!(notes, Note(event.event_value, vel, position, duration))
             end
         elseif event.event_type == TIME_SHIFT
@@ -175,12 +175,14 @@ function perf2notes(events::Performance, perfctx::PerformanceContext
     # End all the notes which don't have a NOTE_OFF event
     for pitch in keys(pitchmap)
         for (start_step, vel) in pitchmap[pitch]
-            position = ticks_per_step * start_step
-            duration = ticks_per_step * (start_step + 5 * perfctx.steps_per_second) # End after 5 seconds
+            position = round(ticks_per_step * start_step)
+            # End after 5 seconds
+            duration = round(ticks_per_step * 5 * perfctx.steps_per_second)
             push!(notes, Note(pitch, vel, position, duration))
         end
     end
 
+    sort!(notes.notes, by=note -> note.position)
     notes
 end
 
@@ -189,4 +191,4 @@ binsize(velocity_bins) = Int(ceil(
 
 bin2velocity(bin, velocity_bins) = MIN_MIDI_VELOCITY + (bin - 1) * binsize(velocity_bins)
 
-second_to_tick(second, qpm, tpq) = second ÷ (1e-3 * ms_per_tick(qpm, tpq))
+second_to_tick(second, qpm, tpq) = second / (1e-3 * ms_per_tick(qpm, tpq))

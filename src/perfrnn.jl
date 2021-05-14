@@ -40,9 +40,7 @@ function generate(perfrnn::PerfRNN;
     end
 
     raw == true && return performance
-    notes = perf2notes(performance, perfctx)
-    sort!(notes.notes, by=note -> note.position)
-    notes
+    perf2notes(performance, perfctx)
 end
 
 # Overloading the Flux LSTM implementation

@@ -15,7 +15,7 @@ function load_model(weights, config)
 
     layers = []
     for i in 1:config["num_layers"]
-        layer = LSTM(
+        layer = BasicLSTM(
                      (i == 1) ? input_dims : lstm_units,
                      lstm_units
                 )

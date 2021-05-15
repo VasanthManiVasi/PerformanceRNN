@@ -1,4 +1,4 @@
-export PerformanceRNN, generate
+export PerfRNN, generate
 
 using StatsBase: wsample
 using Flux: gate
@@ -13,7 +13,7 @@ Generate `PerformanceEvent`s by sampling from a model.
 """
 function generate(perfrnn::PerfRNN;
         primer::Performance=[PerformanceEvent(TIME_SHIFT, 100)],
-        numsteps=1000,
+        numsteps=3000,
         raw = false)
 
     model, perfctx = perfrnn.model, perfrnn.perfctx # For readability
@@ -43,10 +43,28 @@ function generate(perfrnn::PerfRNN;
     perf2notes(performance, perfctx)
 end
 
-# Overloading the Flux LSTM implementation
-# with the TensorFlow 1 BasicLSTMCell implementation
-# https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/keras/layers/legacy_rnn/rnn_cell_impl.py#L786
-function (m::Flux.LSTMCell)((h, c), x) where {A,V,T}
+# Replace Flux's LSTMCell with BasicLSTMCell from TensorFlow 1.
+# It's implementation is slightly different.
+# https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/keras/layers/legacy_rnn/rnn_cell_impl.py#L786-L787
+# https://github.com/FluxML/Flux.jl/blob/master/src/layers/recurrent.jl#L141-L142
+# The replacement is required because the pre-trained models use BasicLSTMCell.
+struct BasicLSTMCell{A,V,S}
+  Wi::A
+  Wh::A
+  b::V
+  state0::S
+end
+
+function BasicLSTMCell(in::Integer, out::Integer;
+                  init = Flux.glorot_uniform,
+                  initb = zeros,
+                  init_state = zeros)
+  cell = BasicLSTMCell(init(out * 4, in), init(out * 4, out), initb(out * 4), (init_state(out,1), init_state(out,1)))
+  cell.b[gate(out, 2)] .= 1
+  return cell
+end
+
+function (m::BasicLSTMCell)((h, c), x) where {A,V,T}
   b, o = m.b, size(h, 1)
   g = m.Wi*x .+ m.Wh*h .+ b
   input = σ.(gate(g, o, 1))
@@ -58,3 +76,16 @@ function (m::Flux.LSTMCell)((h, c), x) where {A,V,T}
   sz = size(x)
   return (h′, c), reshape(h′, :, sz[2:end]...)
 end
+
+Flux.@functor BasicLSTMCell
+
+Base.show(io::IO, l::BasicLSTMCell) =
+  print(io, "BasicLSTMCell(", size(l.Wi, 2), ", ", size(l.Wi, 1)÷4, ")")
+
+"""
+    BasicLSTM(in::Integer, out::Integer)
+Implements the BasicLSTMCell from TensorFlow 1
+https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/keras/layers/legacy_rnn/rnn_cell_impl.py#L648-L814
+"""
+BasicLSTM(a...; ka...) = Flux.Recur(BasicLSTMCell(a...; ka...))
+Flux.Recur(m::BasicLSTMCell) = Flux.Recur(m, m.state0)

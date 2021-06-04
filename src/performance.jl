@@ -76,6 +76,16 @@ function len(perf::Performance)
     steps
 end
 
+"""     PerformanceContext <: Any
+Context object for a `PerfRNN` model.
+
+## Fields
+* `velocity_bins::Int`    : Number of bins for velocity values.
+* `steps_per_second::Int` : Number of steps per second for quantization.
+* `num_classes::Int`      : Total number of event classes (`NOTE_ON` events + `NOTE_OFF` events +
+                            `TIME_SHIFT` events + `VELOCITY` events)
+* `event_ranges::Vector{Tuple{Int, Int, Int}}` : Stores the min and max values of each event type.
+"""
 struct PerformanceContext
     velocity_bins::Int
     steps_per_second::Int
@@ -186,9 +196,19 @@ function perf2notes(events::Performance, perfctx::PerformanceContext
     notes
 end
 
+"""     binsize(velocity_bins)
+Returns the size of a bin given the total number of bins.
+"""
 binsize(velocity_bins) = Int(ceil(
         (MAX_MIDI_VELOCITY - MIN_MIDI_VELOCITY + 1) / velocity_bins))
 
+"""     bin2velocity(bin, velocity_bins)
+Returns a velocity value given a bin and the total number of velocity bins.
+"""
 bin2velocity(bin, velocity_bins) = MIN_MIDI_VELOCITY + (bin - 1) * binsize(velocity_bins)
 
+"""     second_to_tick(second, qpm, tqp)
+Returns a MIDI tick corresponding to the given time in seconds,
+quarter notes per minute and the amount of ticks per quarter note.
+"""
 second_to_tick(second, qpm, tpq) = second / (1e-3 * ms_per_tick(qpm, tpq))

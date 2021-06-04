@@ -8,8 +8,8 @@ struct PerfRNN
     perfctx::PerformanceContext
 end
 
-"""     generate(model, perfctx::Performance)
-Generate `PerformanceEvent`s by sampling from a model.
+"""     generate(perfrnn::PerfRNN, perfctx::Performance)
+Generate `PerformanceEvent`s by sampling from a PerformanceRNN model.
 """
 function generate(perfrnn::PerfRNN;
         primer::Performance=[PerformanceEvent(TIME_SHIFT, 100)],

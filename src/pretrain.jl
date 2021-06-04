@@ -6,7 +6,7 @@ using Flux: loadparams!
 
 const configs = open(TOML.parse, joinpath(@__DIR__, "pretrains.toml"))
 
-"""     load_model(weights, input_dims, lstm_units)
+"""     load_model(weights, config)
 Loads the weights into a Flux model
 """
 function load_model(weights, config)
@@ -59,7 +59,7 @@ function load_model(weights, config)
     model
 end
 
-"""     ckp2_to_jld2(ckptpath, input_dims, lstm_units)
+"""     ckpt2_to_jld2(ckptpath::String, ckptname::String, savepath::String)
 Loads a pre-trained model from a tensorflow checkpoint and saves to jld2
 """
 function ckpt_to_jld2(ckptpath::String; ckptname::String="perfrnn.ckpt", savepath::String="./")
@@ -120,18 +120,6 @@ function load_pretrain(model_name::String)
     perfrnn = PerfRNN(model, perfctx)
 end
 
-# From Transformers.jl
-macro pretrain_str(name)
-    :(load_pretrain($(esc(name))))
-end
-
-function description(description::String, host::String, link::String, cite=nothing)
-  """
-  $description
-  Released by $(host) at $(link).
-  $(isnothing(cite) ? "" : "\nCiting:\n$cite")"""
-end
-
 """     list_pretrains()
 List all the available pre-trained models.
 """
@@ -149,4 +137,16 @@ function register_configs(configs)
                       fetch_method=google_download)
         DataDeps.register(dep)
     end
+end
+
+# From Transformers.jl
+macro pretrain_str(name)
+    :(load_pretrain($(esc(name))))
+end
+
+function description(description::String, host::String, link::String, cite=nothing)
+  """
+  $description
+  Released by $(host) at $(link).
+  $(isnothing(cite) ? "" : "\nCiting:\n$cite")"""
 end

@@ -1,5 +1,5 @@
-export PerformanceEvent, Performance, PerformanceContext
-export encodeindex, decodeindex, perf2notes, len
+export PerformanceEvent, Performance
+export encodeindex, decodeindex, perf2notes
 
 """     PerformanceEvent <: Any
 Event-based performance representation from Oore et al.
@@ -57,17 +57,50 @@ function Base.show(io::IO, a::PerformanceEvent)
     print(io, s)
 end
 
-"""     Performance
-A `Performance` is a vector of `PerformanceEvent`s
+"""     Performance <: Any
+`Performance` is a vector of `PerformanceEvents` along with its context variables
+
+## Fields
+* `events::Vector{PerformanceEvent}` : The actual performance vector.
+* `velocity_bins::Int`    : Number of bins for velocity values.
+* `steps_per_second::Int` : Number of steps per second for quantization.
+* `num_classes::Int`      : Total number of event classes (`NOTE_ON` events + `NOTE_OFF` events +
+                            `TIME_SHIFT` events + `VELOCITY` events)
+* `event_ranges::Vector{Tuple{Int, Int, Int}}` : Stores the min and max values of each event type.
 """
-Performance = Vector{PerformanceEvent}
+mutable struct Performance
+    events::Vector{PerformanceEvent}
+    velocity_bins::Int
+    steps_per_second::Int
+    num_classes::Int
+    event_ranges::Vector{Tuple{Int, Int ,Int}} # Stores the range of each event type
+
+    function Performance(;velocity_bins::Int = 32, steps_per_second::Int = 100, max_shift_steps::Int = 100)
+        event_ranges = [
+            (NOTE_ON, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
+            (NOTE_OFF, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
+            (TIME_SHIFT, 1, max_shift_steps)
+        ]
+        velocity_bins > 0 && push!(event_ranges, (VELOCITY, 1, velocity_bins))
+        num_classes = sum(map(range -> range[3] - range[2] + 1, event_ranges))
+        new(Vector{PerformanceEvent}(), velocity_bins, steps_per_second, num_classes, event_ranges)
+    end
+end
+
+function Base.getproperty(obj::Performance, sym::Symbol)
+    if sym === :labels
+        return 0:(obj.num_classes - 1)
+    else
+        getfield(obj, sym)
+    end
+end
 
 """     len(perf::Performance)
 Returns the length of a performance in steps
 """
-function len(perf::Performance)
+function len(performance::Performance)
     steps = 0
-    for event in perf
+    for event in performance.events
         if event.event_type == TIME_SHIFT
             steps += event.event_value
         end
@@ -76,48 +109,12 @@ function len(perf::Performance)
     steps
 end
 
-"""     PerformanceContext <: Any
-Context object for a `PerfRNN` model.
-
-## Fields
-* `velocity_bins::Int`    : Number of bins for velocity values.
-* `steps_per_second::Int` : Number of steps per second for quantization.
-* `num_classes::Int`      : Total number of event classes (`NOTE_ON` events + `NOTE_OFF` events +
-                            `TIME_SHIFT` events + `VELOCITY` events)
-* `event_ranges::Vector{Tuple{Int, Int, Int}}` : Stores the min and max values of each event type.
-"""
-struct PerformanceContext
-    velocity_bins::Int
-    steps_per_second::Int
-    num_classes::Int
-    event_ranges::Vector{Tuple{Int, Int ,Int}} # Stores the range of each event type
-
-    function PerformanceContext(;velocity_bins::Int = 32, steps_per_second::Int = 100, max_shift_steps::Int = 100)
-        event_ranges = [
-            (NOTE_ON, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
-            (NOTE_OFF, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
-            (TIME_SHIFT, 1, max_shift_steps)
-        ]
-        velocity_bins > 0 && push!(event_ranges, (VELOCITY, 1, velocity_bins))
-        num_classes = sum(map(range -> range[3] - range[2] + 1, event_ranges))
-        new(velocity_bins, steps_per_second, num_classes, event_ranges)
-    end
-end
-
-function Base.getproperty(obj::PerformanceContext, sym::Symbol)
-    if sym === :labels
-        return 0:(obj.num_classes - 1)
-    else
-        getfield(obj, sym)
-    end
-end
-
-"""     encodeindex(event::PerformanceEvent, perfctx::PerformanceContext)
+"""     encodeindex(event::PerformanceEvent, performance::Performance)
 Encodes a `PerformanceEvent` to its corresponding one hot index.
 """
-function encodeindex(event::PerformanceEvent, perfctx::PerformanceContext)
+function encodeindex(event::PerformanceEvent, performance::Performance)
     offset = 0
-    for (type, min, max) in perfctx.event_ranges
+    for (type, min, max) in performance.event_ranges
         if event.event_type == type
             return offset + event.event_value - min
         end
@@ -125,12 +122,12 @@ function encodeindex(event::PerformanceEvent, perfctx::PerformanceContext)
     end
 end
 
-"""     decodeindex(idx::Int, perfctx::PerformanceContext)
+"""     decodeindex(idx::Int, performance::Performance)
 Decodes a one hot index to its corresponding `PerformanceEvent`.
 """
-function decodeindex(idx::Int, perfctx::PerformanceContext)
+function decodeindex(idx::Int, performance::Performance)
     offset = 0
-    for (type, min, max) in perfctx.event_ranges
+    for (type, min, max) in performance.event_ranges
         if idx < offset + (max - min + 1)
             return PerformanceEvent(type, min + idx - offset)
         end
@@ -138,18 +135,18 @@ function decodeindex(idx::Int, perfctx::PerformanceContext)
     end
 end
 
-"""     perf2notes(events::Performance, perfctx::PerformanceContext}
+"""     perf2notes(perf::Performance}
 Converts a sequence of `PerformanceEvent`s to `MIDI.Notes`.
 """
-function perf2notes(events::Performance, perfctx::PerformanceContext
+function perf2notes(performance::Performance
                     ;ppq = DEFAULT_PPQ,
                      qpm = DEFAULT_QPM)
-    ticks_per_step = second_to_tick(1, qpm, ppq) / perfctx.steps_per_second # sps = 100
+    ticks_per_step = second_to_tick(1, qpm, ppq) / performance.steps_per_second # sps = 100
     notes = Notes(tpq = ppq)
     pitchmap = Dict{Int, Vector{Tuple{Int, Int}}}()
     step = 0
     velocity = 64
-    for event in events
+    for event in performance.events
         if event.event_type == NOTE_ON
             if event.event_value in keys(pitchmap)
                 push!(pitchmap[event.event_value], (step, velocity))
@@ -177,7 +174,7 @@ function perf2notes(events::Performance, perfctx::PerformanceContext
             step += event.event_value
         elseif event.event_type == VELOCITY
             if event.event_value != velocity
-                velocity = bin2velocity(event.event_value, perfctx.velocity_bins)
+                velocity = bin2velocity(event.event_value, performance.velocity_bins)
             end
         end
     end
@@ -187,7 +184,7 @@ function perf2notes(events::Performance, perfctx::PerformanceContext
         for (start_step, vel) in pitchmap[pitch]
             position = round(ticks_per_step * start_step)
             # End after 5 seconds
-            duration = round(ticks_per_step * 5 * perfctx.steps_per_second)
+            duration = round(ticks_per_step * 5 * performance.steps_per_second)
             push!(notes, Note(pitch, vel, position, duration))
         end
     end

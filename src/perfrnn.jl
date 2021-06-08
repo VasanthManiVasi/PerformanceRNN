@@ -5,42 +5,42 @@ using Flux: gate
 
 struct PerfRNN
     model
-    perfctx::PerformanceContext
+    performance::Performance
 end
 
-"""     generate(perfrnn::PerfRNN, perfctx::Performance)
+"""     generate(perfrnn::PerfRNN, performance::Performance)
 Generate `PerformanceEvent`s by sampling from a PerformanceRNN model.
 """
 function generate(perfrnn::PerfRNN;
-        primer::Performance=[PerformanceEvent(TIME_SHIFT, 100)],
+        primer::Vector{PerformanceEvent}=[PerformanceEvent(TIME_SHIFT, 100)],
         numsteps=3000,
         raw = false)
 
-    model, perfctx = perfrnn.model, perfrnn.perfctx # For readability
+    model, performance = perfrnn.model, perfrnn.performance # For readability
     Flux.reset!(model)
     
+    performance.events = deepcopy(primer)
+
     # Primer is already numsteps or longer
-    if len(primer) >= numsteps
-        return primer
+    if len(performance) >= numsteps
+        return performance
     end
 
-    performance = deepcopy(primer)
-
-    indices = map(event -> encodeindex(event, perfctx), performance)
-    inputs = map(index -> Flux.onehot(index, perfctx.labels), indices)
+    indices = map(event -> encodeindex(event, performance), performance.events)
+    inputs = map(index -> Flux.onehot(index, performance.labels), indices)
 
     outputs = model.(inputs)
-    out = wsample(perfctx.labels, softmax(outputs[end]))
-    push!(performance, decodeindex(out, perfctx))
+    out = wsample(performance.labels, softmax(outputs[end]))
+    push!(performance.events, decodeindex(out, performance))
 
     while len(performance) < numsteps
-        input = Flux.onehot(out, perfctx.labels)
-        out = wsample(perfctx.labels, softmax(model(input)))
-        push!(performance, decodeindex(out, perfctx))
+        input = Flux.onehot(out, performance.labels)
+        out = wsample(performance.labels, softmax(model(input)))
+        push!(performance.events, decodeindex(out, performance))
     end
 
     raw == true && return performance
-    perf2notes(performance, perfctx)
+    perf2notes(performance)
 end
 
 # Replace Flux's LSTMCell with BasicLSTMCell from TensorFlow 1.

@@ -87,26 +87,35 @@ mutable struct Performance
     end
 end
 
-function Base.getproperty(obj::Performance, sym::Symbol)
+function Base.getproperty(performance::Performance, sym::Symbol)
     if sym === :labels
-        return 0:(obj.num_classes - 1)
+        return 0:(performance.num_classes - 1)
+    elseif sym === :numsteps
+        steps = 0
+        for event in performance
+            if event.event_type == TIME_SHIFT
+                steps += event.event_value
+            end
+        end
+        return steps
     else
-        getfield(obj, sym)
+        getfield(performance, sym)
     end
 end
 
-"""     len(perf::Performance)
-Returns the length of a performance in steps
-"""
-function len(performance::Performance)
-    steps = 0
-    for event in performance.events
-        if event.event_type == TIME_SHIFT
-            steps += event.event_value
-        end
-    end
+Base.push!(performance::Performance, event::PerformanceEvent) = push!(performance.events, event)
 
-    steps
+Base.length(performance::Performance) = length(performance.events)
+
+Base.getindex(performance::Performance, idx) = performance.events[idx]
+
+Base.iterate(performance::Performance, state=1) = iterate(performance.events, state)
+
+"""     truncate(performance::Performance, numevents)
+Truncate the performance to exactly `numevents` events.
+"""
+function Base.truncate(performance::Performance, numevents)
+    performance.events = performance.events[1:numevents]
 end
 
 """     encodeindex(event::PerformanceEvent, performance::Performance)
@@ -146,7 +155,7 @@ function perf2notes(performance::Performance
     pitchmap = Dict{Int, Vector{Tuple{Int, Int}}}()
     step = 0
     velocity = 64
-    for event in performance.events
+    for event in performance
         if event.event_type == NOTE_ON
             if event.event_value in keys(pitchmap)
                 push!(pitchmap[event.event_value], (step, velocity))

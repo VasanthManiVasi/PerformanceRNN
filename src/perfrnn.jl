@@ -22,21 +22,21 @@ function generate(perfrnn::PerfRNN;
     performance.events = deepcopy(primer)
 
     # Primer is already numsteps or longer
-    if len(performance) >= numsteps
+    if performance.numsteps >= numsteps
         return performance
     end
 
-    indices = map(event -> encodeindex(event, performance), performance.events)
+    indices = map(event -> encodeindex(event, performance), performance)
     inputs = map(index -> Flux.onehot(index, performance.labels), indices)
 
     outputs = model.(inputs)
     out = wsample(performance.labels, softmax(outputs[end]))
-    push!(performance.events, decodeindex(out, performance))
+    push!(performance, decodeindex(out, performance))
 
-    while len(performance) < numsteps
+    while performance.numsteps < numsteps
         input = Flux.onehot(out, performance.labels)
         out = wsample(performance.labels, softmax(model(input)))
-        push!(performance.events, decodeindex(out, performance))
+        push!(performance, decodeindex(out, performance))
     end
 
     raw == true && return performance

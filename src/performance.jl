@@ -104,13 +104,15 @@ function Base.getproperty(performance::Performance, sym::Symbol)
     end
 end
 
-Base.push!(performance::Performance, event::PerformanceEvent) = push!(performance.events, event)
+Base.length(p::Performance) = length(p.events)
+Base.getindex(p::Performance, idx::Int) = p.events[idx]
+Base.getindex(p::Performance, range) = p.events[range]
+Base.lastindex(p::Performance) = lastindex(p.events)
+Base.firstindex(p::Performance) = firstindex(p.events)
+Base.iterate(p::Performance, state=1) = iterate(p.events, state)
 
-Base.length(performance::Performance) = length(performance.events)
-
-Base.getindex(performance::Performance, idx) = performance.events[idx]
-
-Base.iterate(performance::Performance, state=1) = iterate(performance.events, state)
+Base.push!(p::Performance, event::PerformanceEvent) = push!(p.events, event)
+Base.pop!(p::Performance) = pop!(p.events)
 
 """     truncate(performance::Performance, numevents)
 Truncate the performance to exactly `numevents` events.
@@ -125,6 +127,7 @@ function append_steps(performance::Performance, num_steps)
         performance[end].event_value < performance.max_shift_steps)
         steps = min(num_steps, performance.max_shift_steps - performance[end].event_value)
         performance[end].event_value += steps
+        num_steps -= steps
     end
 
     while num_steps >= performance.max_shift_steps
@@ -142,7 +145,7 @@ function trim_steps(performance::Performance, num_steps)
     while !isempty(performance) && trimmed < num_steps
         if performance[end].event_type == TIME_SHIFT
             if trimmed + performance[end].event_value > num_steps
-                performance[end].event_value = performance[end].event_value - num_steps + steps_trimmed
+                performance[end].event_value = performance[end].event_value - num_steps + trimmed
                 trimmed = num_steps
             else
                 trimmed += performance[end].event_value
@@ -153,14 +156,15 @@ function trim_steps(performance::Performance, num_steps)
         end
     end
 end
+
 function set_length(performance, steps)
-    if performance.num_steps < steps
-        append_steps(performance, steps - performance.num_steps)
-    elseif self.num_steps > steps
-        trim_steps(performance, performance.num_steps - steps)
+    if performance.numsteps < steps
+        append_steps(performance, steps - performance.numsteps)
+    elseif performance.numsteps > steps
+        trim_steps(performance, performance.numsteps - steps)
     end
 
-    @assert performance.num_steps == steps
+    @assert performance.numsteps == steps
 end
 
 """     encodeindex(event::PerformanceEvent, performance::Performance)

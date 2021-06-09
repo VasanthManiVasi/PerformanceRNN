@@ -15,7 +15,7 @@ It corresponds to NOTE_ON, NOTE_OFF events for each of the 128 midi pitches,
 * `event_type::Int`  :  Type of the event. One of {NOTE_ON, NOTE_OFF, TIME_SHIFT, VELOCITY}.
 * `event_value::Int` :  Value of the event corresponding to its type.
 """
-struct PerformanceEvent
+mutable struct PerformanceEvent
     event_type::Int
     event_value::Int
 
@@ -73,6 +73,7 @@ mutable struct Performance
     velocity_bins::Int
     steps_per_second::Int
     num_classes::Int
+    max_shift_steps::Int
     event_ranges::Vector{Tuple{Int, Int ,Int}} # Stores the range of each event type
 
     function Performance(;velocity_bins::Int = 32, steps_per_second::Int = 100, max_shift_steps::Int = 100)
@@ -83,7 +84,7 @@ mutable struct Performance
         ]
         velocity_bins > 0 && push!(event_ranges, (VELOCITY, 1, velocity_bins))
         num_classes = sum(map(range -> range[3] - range[2] + 1, event_ranges))
-        new(Vector{PerformanceEvent}(), velocity_bins, steps_per_second, num_classes, event_ranges)
+        new(Vector{PerformanceEvent}(), velocity_bins, steps_per_second, num_classes, max_shift_steps, event_ranges)
     end
 end
 
@@ -116,6 +117,50 @@ Truncate the performance to exactly `numevents` events.
 """
 function Base.truncate(performance::Performance, numevents)
     performance.events = performance.events[1:numevents]
+end
+
+function append_steps(performance::Performance, num_steps)
+    if (!isempty(performance) &&
+        performance[end].event_type == TIME_SHIFT &&
+        performance[end].event_value < performance.max_shift_steps)
+        steps = min(num_steps, performance.max_shift_steps - performance[end].event_value)
+        performance[end].event_value += steps
+    end
+
+    while num_steps >= performance.max_shift_steps
+        push!(performance, PerformanceEvent(TIME_SHIFT, performance.max_shift_steps))
+        num_steps -= performance.max_shift_steps
+    end
+
+    if num_steps > 0
+        push!(performance, PerformanceEvent(TIME_SHIFT, num_steps))
+    end
+end
+
+function trim_steps(performance::Performance, num_steps)
+    trimmed = 0
+    while !isempty(performance) && trimmed < num_steps
+        if performance[end].event_type == TIME_SHIFT
+            if trimmed + performance[end].event_value > num_steps
+                performance[end].event_value = performance[end].event_value - num_steps + steps_trimmed
+                trimmed = num_steps
+            else
+                trimmed += performance[end].event_value
+                pop!(performance)
+            end
+        else
+            pop!(performance)
+        end
+    end
+end
+function set_length(performance, steps)
+    if performance.num_steps < steps
+        append_steps(performance, steps - performance.num_steps)
+    elseif self.num_steps > steps
+        trim_steps(performance, performance.num_steps - steps)
+    end
+
+    @assert performance.num_steps == steps
 end
 
 """     encodeindex(event::PerformanceEvent, performance::Performance)

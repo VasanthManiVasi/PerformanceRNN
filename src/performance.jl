@@ -1,5 +1,5 @@
 export PerformanceEvent, Performance
-export encodeindex, decodeindex, perf2notes
+export encodeindex, decodeindex, perf2notes, set_length
 
 """     PerformanceEvent <: Any
 Event-based performance representation from Oore et al.
@@ -15,7 +15,7 @@ It corresponds to NOTE_ON, NOTE_OFF events for each of the 128 midi pitches,
 * `event_type::Int`  :  Type of the event. One of {NOTE_ON, NOTE_OFF, TIME_SHIFT, VELOCITY}.
 * `event_value::Int` :  Value of the event corresponding to its type.
 """
-mutable struct PerformanceEvent
+struct PerformanceEvent
     event_type::Int
     event_value::Int
 
@@ -66,6 +66,7 @@ end
 * `steps_per_second::Int` : Number of steps per second for quantization.
 * `num_classes::Int`      : Total number of event classes (`NOTE_ON` events + `NOTE_OFF` events +
                             `TIME_SHIFT` events + `VELOCITY` events)
+* `max_shift_steps::Int`  : Maximum number of shift steps in a `TIME_SHIFT`.
 * `event_ranges::Vector{Tuple{Int, Int, Int}}` : Stores the min and max values of each event type.
 """
 mutable struct Performance
@@ -76,7 +77,11 @@ mutable struct Performance
     max_shift_steps::Int
     event_ranges::Vector{Tuple{Int, Int ,Int}} # Stores the range of each event type
 
-    function Performance(;velocity_bins::Int = 32, steps_per_second::Int = 100, max_shift_steps::Int = 100)
+    function Performance(;
+            velocity_bins::Int = 32,
+            steps_per_second::Int = 100,
+            max_shift_steps::Int = 100,
+            events::Vector{PerformanceEvent}=Vector{PerformanceEvent}())
         event_ranges = [
             (NOTE_ON, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
             (NOTE_OFF, MIN_MIDI_PITCH, MAX_MIDI_PITCH)
@@ -84,7 +89,7 @@ mutable struct Performance
         ]
         velocity_bins > 0 && push!(event_ranges, (VELOCITY, 1, velocity_bins))
         num_classes = sum(map(range -> range[3] - range[2] + 1, event_ranges))
-        new(Vector{PerformanceEvent}(), velocity_bins, steps_per_second, num_classes, max_shift_steps, event_ranges)
+        new(events, velocity_bins, steps_per_second, num_classes, max_shift_steps, event_ranges)
     end
 end
 
@@ -104,15 +109,36 @@ function Base.getproperty(performance::Performance, sym::Symbol)
     end
 end
 
+# TODO:
+#   Use metaprogramming
 Base.length(p::Performance) = length(p.events)
 Base.getindex(p::Performance, idx::Int) = p.events[idx]
 Base.getindex(p::Performance, range) = p.events[range]
 Base.lastindex(p::Performance) = lastindex(p.events)
 Base.firstindex(p::Performance) = firstindex(p.events)
+Base.setindex!(p::Performance, event::PerformanceEvent, idx::Int) = setindex!(p.events, event, idx)
 Base.iterate(p::Performance, state=1) = iterate(p.events, state)
-
+Base.view(p::Performance, range) = view(p.events, range)
 Base.push!(p::Performance, event::PerformanceEvent) = push!(p.events, event)
 Base.pop!(p::Performance) = pop!(p.events)
+Base.append!(p::Performance, events::Vector{PerformanceEvent}) = append!(p.events, events)
+
+function Base.append!(p1::Performance, p2::Performance)
+    p1.event_ranges == p2.event_ranges || throw(
+        ArgumentError("The performances do not have the same event ranges."))
+    p1.num_classes == p2.num_classes || throw(
+        ArgumentError("The performances do not have the same number of classes."))
+    append!(p1, p2.events)
+end
+
+function Base.copy(p::Performance)
+    Performance(copy(p.events),
+        p.velocity_bins,
+        p.steps_per_second,
+        p.num_classes,
+        p.max_shift_steps,
+        p.event_ranges)
+end
 
 """     truncate(performance::Performance, numevents)
 Truncate the performance to exactly `numevents` events.
@@ -121,32 +147,33 @@ function Base.truncate(performance::Performance, numevents)
     performance.events = performance.events[1:numevents]
 end
 
-function append_steps(performance::Performance, num_steps)
+function append_steps(performance::Performance, numsteps)
+    max_shift_steps = performance.max_shift_steps # For readability
     if (!isempty(performance) &&
         performance[end].event_type == TIME_SHIFT &&
-        performance[end].event_value < performance.max_shift_steps)
-        steps = min(num_steps, performance.max_shift_steps - performance[end].event_value)
-        performance[end].event_value += steps
-        num_steps -= steps
+        performance[end].event_value < max_shift_steps)
+        steps = min(numsteps, max_shift_steps - performance[end].event_value)
+        performance[end] = PerformanceEvent(TIME_SHIFT, performance[end].event_value + steps)
+        numsteps -= steps
     end
 
-    while num_steps >= performance.max_shift_steps
-        push!(performance, PerformanceEvent(TIME_SHIFT, performance.max_shift_steps))
-        num_steps -= performance.max_shift_steps
+    while numsteps >= max_shift_steps
+        push!(performance, PerformanceEvent(TIME_SHIFT, max_shift_steps))
+        numsteps -= max_shift_steps
     end
 
-    if num_steps > 0
-        push!(performance, PerformanceEvent(TIME_SHIFT, num_steps))
+    if numsteps > 0
+        push!(performance, PerformanceEvent(TIME_SHIFT, numsteps))
     end
 end
 
-function trim_steps(performance::Performance, num_steps)
+function trim_steps(performance::Performance, numsteps)
     trimmed = 0
-    while !isempty(performance) && trimmed < num_steps
+    while !isempty(performance) && trimmed < numsteps
         if performance[end].event_type == TIME_SHIFT
-            if trimmed + performance[end].event_value > num_steps
-                performance[end].event_value = performance[end].event_value - num_steps + trimmed
-                trimmed = num_steps
+            if trimmed + performance[end].event_value > numsteps
+                performance[end] = PerformanceEvent(TIME_SHIFT, performance[end].event_value - numsteps + trimmed)
+                trimmed = numsteps
             else
                 trimmed += performance[end].event_value
                 pop!(performance)

@@ -1,18 +1,20 @@
 export notes2midi
 
+using MIDI: SetTempoEvent, TimeSignatureEvent
+
 """     notes2midi(notes::Notes)
 Return a `MIDIFile` from the given `Notes`.
 """
-function notes2midi(notes::Notes; qpm = 120)
+function notes2midi(
+        notes::Notes;
+        qpm = 120,
+        timesig::TimeSignatureEvent = TimeSignatureEvent(0, 4, 4, 24, 8))
     metatrack = MIDITrack()
-    # TODO:
-    #   Find a better way to set time signature
-    qpm_bytes = reinterpret(UInt8, [UInt32(6e7 / qpm)])
     events = [
-        MetaEvent(0, 0x51, reverse(qpm_bytes[1:3])),
-        MetaEvent(0, 0x58, UInt8[0x04, 0x02, 0x18, 0x08])  # 4/4 Time Signature
+        SetTempoEvent(0, Int(6e7 / qpm)),
+        timesig
     ]
-    addevents!(metatrack, [0, 0], events) # Add defaults
+    addevents!(metatrack, [0, 0], events) # Add the meta events
     notestrack = MIDITrack()
     addnotes!(notestrack, notes)
     midi = MIDIFile(1, notes.tpq, [metatrack, notestrack])

@@ -40,7 +40,7 @@ function generate(perfrnn::PerfRNN;
     end
 
     raw == true && return performance
-    perf2notes(performance)
+    getnotesequence(performance)
 end
 
 # Replace Flux's LSTMCell with BasicLSTMCell from TensorFlow 1.

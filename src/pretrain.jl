@@ -88,7 +88,7 @@ readckpt(path) = error("readckpt require TensorFlow.jl installed. run `Pkg.add(\
 
         for (name, shape) ∈ shapes
             weight = ckpt.get_tensor(name)
-            if length(shape) == 2 && name != "cls/seq_relationship/output_weights"
+            if length(shape) == 2
                 weight = collect(weight')
             end
             weights[name] = weight

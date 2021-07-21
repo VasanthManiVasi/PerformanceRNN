@@ -1,6 +1,7 @@
 module PerformanceRNN
 
 using Flux, MIDI, NoteSequences
+using NoteSequences.PerformanceRepr
 
 include("perfrnn.jl")
 include("pretrain.jl")

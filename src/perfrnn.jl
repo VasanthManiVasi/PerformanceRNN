@@ -5,38 +5,46 @@ using Flux: gate
 
 struct PerfRNN
     model
-    performance::Performance
+    encoder::PerformanceOneHotEncoding
+    num_velocitybins::Int
 end
 
-"""     generate(perfrnn::PerfRNN, performance::Performance)
+"""
+    generate(perfrnn::PerfRNN, performance::Performance)
+
 Generate `PerformanceEvent`s by sampling from a PerformanceRNN model.
 """
 function generate(perfrnn::PerfRNN;
-        primer::Vector{PerformanceEvent}=[PerformanceEvent(TIME_SHIFT, 100)],
-        numsteps=3000,
-        raw = false)
+                  primer::Performance=Performance(100, velocity_bins=perfrnn.num_velocitybins),
+                  numsteps=3000,
+                  raw=false)
 
-    model, performance = perfrnn.model, perfrnn.performance # For readability
+    model, encoder = perfrnn.model, perfrnn.encoder
     Flux.reset!(model)
     
-    performance.events = deepcopy(primer)
+    performance = deepcopy(primer)
+
+    if isempty(performance)
+        push!(performance, encoder.defaultevent)
+    end
 
     # Primer is already numsteps or longer
     if performance.numsteps >= numsteps
         return performance
     end
 
-    indices = map(event -> encodeindex(event, performance), performance)
-    inputs = map(index -> Flux.onehot(index, performance.labels), indices)
+    indices = map(event -> encodeindex(event, encoder), performance)
+    inputs = map(index -> Flux.onehot(index, encoder.labels), indices)
 
     outputs = model.(inputs)
-    out = wsample(performance.labels, softmax(outputs[end]))
-    push!(performance, decodeindex(out, performance))
+    out = wsample(encoder.labels, softmax(outputs[end]))
+    push!(performance, decodeindex(out, encoder))
 
     while performance.numsteps < numsteps
-        input = Flux.onehot(out, performance.labels)
-        out = wsample(performance.labels, softmax(model(input)))
-        push!(performance, decodeindex(out, performance))
+        input = Flux.onehot(out, encoder.labels)
+        logits = model(input)
+        out = wsample(encoder.labels, softmax(logits))
+        push!(performance, decodeindex(out, encoder))
     end
 
     raw == true && return performance

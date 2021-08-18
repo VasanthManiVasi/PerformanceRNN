@@ -1,6 +1,6 @@
 export PerfRNN, generate
 
-using StatsBase: wsample
+using StatsBase
 using Flux: gate
 
 struct PerfRNN
@@ -17,7 +17,7 @@ Generate `PerformanceEvent`s by sampling from a PerformanceRNN model.
 function generate(perfrnn::PerfRNN;
                   primer::Performance=Performance(100, velocity_bins=perfrnn.num_velocitybins),
                   numsteps=3000,
-                  raw=false)
+                  as_notesequence=false)
 
     model, encoder = perfrnn.model, perfrnn.encoder
     Flux.reset!(model)
@@ -47,8 +47,9 @@ function generate(perfrnn::PerfRNN;
         push!(performance, decodeindex(out, encoder))
     end
 
-    raw == true && return performance
-    getnotesequence(performance)
+    ns = getnotesequence(performance)
+    as_notesequence == true && return ns
+    notesequence_to_midi(ns)
 end
 
 # Replace Flux's LSTMCell with BasicLSTMCell from TensorFlow 1.

@@ -33,23 +33,23 @@ function generate(perfrnn::PerfRNN;
         return performance
     end
 
-    indices = map(event -> encodeindex(event, encoder), performance)
+    indices = map(event -> encode_event(event, encoder), performance)
     inputs = map(index -> Flux.onehot(index, encoder.labels), indices)
 
     outputs = model.(inputs)
     out = wsample(encoder.labels, softmax(outputs[end]))
-    push!(performance, decodeindex(out, encoder))
+    push!(performance, decode_event(out, encoder))
 
     while performance.numsteps < numsteps
         input = Flux.onehot(out, encoder.labels)
         logits = model(input)
         out = wsample(encoder.labels, softmax(logits))
-        push!(performance, decodeindex(out, encoder))
+        push!(performance, decode_event(out, encoder))
     end
 
     ns = getnotesequence(performance)
     as_notesequence == true && return ns
-    notesequence_to_midi(ns)
+    midifile(ns)
 end
 
 # Replace Flux's LSTMCell with BasicLSTMCell from TensorFlow 1.

@@ -1,4 +1,4 @@
-export ckpt_to_jld2, load_pretrain, list_pretrains, @pretrain_str
+export ckpt_to_jld2, load_pretrained, list_pretrains, @pretrained_str
 
 using JLD2, Requires, Pkg.TOML, DataDeps
 using GoogleDrive: google_download
@@ -101,7 +101,7 @@ end
 """     load_pretrain(path)
 Loads a pre-trained performance rnn model.
 """
-function load_pretrain(model_name::String)
+function load_pretrained(model_name::String)
     if model_name ∉ keys(configs)
         error("""Invalid model. 
                Please try list_pretrains() to check the available pre-trained models""")
@@ -140,8 +140,8 @@ function register_configs(configs)
 end
 
 # From Transformers.jl
-macro pretrain_str(name)
-    :(load_pretrain($(esc(name))))
+macro pretrained_str(name)
+    :(load_pretrained($(esc(name))))
 end
 
 function description(description::String, host::String, link::String, cite=nothing)

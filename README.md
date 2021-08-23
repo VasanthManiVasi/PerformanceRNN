@@ -11,16 +11,15 @@ Implementation of the [PerformanceRNN](https://arxiv.org/abs/1808.03715) in Juli
 # Example
 
 ```julia
+using FileIO
 using PerformanceRNN
-using FileIO: save
-
 ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 
-perfrnn = pretrain"perfrnn_dynamics"
+perfrnn = pretrained"perfrnn_dynamics"
 
-notes = generate(perfrnn)
+midi = generate(perfrnn)
 
-save("generated.mid", notes2midi(notes))
+save("generated.mid", midi)
 ```
 
 
